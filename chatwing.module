@@ -11,9 +11,9 @@ define('CW_DEBUG', TRUE);
 define('CW_USE_STAGING', TRUE);
 define('CW_CLIENT', 'joomla');
 
-require_once CW_MODULE_PATH . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'chatwing-sdk' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Chatwing' . DIRECTORY_SEPARATOR . 'autoloader.php';
+require_once CW_MODULE_PATH . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'chatwing-php-sdk' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Chatwing' . DIRECTORY_SEPARATOR . 'autoloader.php';
 
-require_once CW_MODULE_PATH . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'chatwing-sdk' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Chatwing' . DIRECTORY_SEPARATOR . 'start.php';
+require_once CW_MODULE_PATH . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'chatwing-php-sdk' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Chatwing' . DIRECTORY_SEPARATOR . 'start.php';
 
 /**
  * [chatwing_help description]
