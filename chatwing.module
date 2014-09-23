@@ -1,0 +1,263 @@
+<?php
+/**
+ * @file
+ * Chatwing module for Drupal
+ * @package Chatwing\Plugins\Drupal
+ * @author Tri Dung Pham <tridungpham.89@gmail.com>
+ */
+
+define('CW_MODULE_PATH', dirname(__FILE__));
+define('CW_DEBUG', TRUE);
+define('CW_USE_STAGING', TRUE);
+define('CW_CLIENT', 'joomla');
+
+require_once CW_MODULE_PATH . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'chatwing-sdk' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Chatwing' . DIRECTORY_SEPARATOR . 'autoloader.php';
+
+require_once CW_MODULE_PATH . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'chatwing-sdk' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Chatwing' . DIRECTORY_SEPARATOR . 'start.php';
+
+/**
+ * [chatwing_help description]
+ * @param $path
+ * @param $arg
+ * @return string [type]       [description]
+ */
+function chatwing_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#chatwing':
+      return '<p>' . t('Display chatwing box') . '</p>';
+
+    break;
+  }
+}
+
+/**
+ * Register configuration form
+ * @return string [type] [description]
+ */
+function chatwing_configuration_form() {
+  $output = '';
+  $form = drupal_get_form('chatwing_form');
+  $output .= drupal_render($form);
+
+  return $output;
+}
+
+/**
+ * Create configuration form in BO
+ * @param  [type] $node       [description]
+ * @param  [type] $form_state [description]
+ * @return [type]             [description]
+ */
+function chatwing_form($node, &$form_state) {
+  $form['chatwing_access_token'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Chatwing API Access Token'),
+    '#default_value' => variable_get('chatwing_access_token', ''),
+    '#required' => TRUE,
+    '#description' => t('API Key to retrieve chatbox from chatwing user account')
+  );
+
+  $form['chatwing_chatbox_default_width'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Chatbox default width'),
+    '#default_value' => variable_get('chatwing_chatbox_default_width', '640'),
+    '#required' => TRUE,
+    '#description' => t('Default width for chatbox')
+  );
+
+  $form['chatbox_default_height'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Chatbox default height'),
+    '#default_value' => variable_get('chatwing_chatbox_default_height', '480'),
+    '#required' => TRUE,
+    '#description' => t('Default height for chatbox')
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Register Chatwing chatbox block
+ * @return [type] [description]
+ */
+function chatwing_block_info() {
+  $blocks['chatwing'] = array(
+    'info' => t('Display a chatbox'),
+    'cache' => DRUPAL_CACHE_PER_ROLE
+  );
+
+  return $blocks;
+}
+
+/**
+ *  Implements hook_block_configure().
+ * @param string $delta
+ * @return array
+ */
+function chatwing_block_configure($delta = '') {
+  switch ($delta) {
+    case 'chatwing':
+      return chatwing_form_block_chatbox_configuration();
+
+    break;
+
+  }
+}
+
+function chatwing_form_block_chatbox_configuration() {
+  $form = array();
+  $form['chatwing_chatbox'] = array(
+    '#type' => 'select',
+    '#title' => t('Choose chatbox'),
+    '#options' => chatwing_get_chatboxes_list(),
+    '#default_value' => variable_get('chatwing_chatbox', ''),
+    '#required' => TRUE
+  );
+
+  $form['chatwing_chatbox_width'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Chatbox width'),
+    '#default_value' => variable_get('chatwing_chatbox_width', variable_get('chatwing_chatbox_default_width', 640)),
+    '#required' => TRUE
+  );
+
+  $form['chatwing_chatbox_height'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Chatbox height'),
+    '#default_value' => variable_get('chatwing_chatbox_height', variable_get('chatwing_chatbox_default_height', 480)),
+    '#required' => TRUE
+  );
+
+  $form['chatbox_enable_custom_login'] = array(
+    '#type' => 'radios',
+    '#title' => t('Enable custom login feature ?'),
+    '#options' => array(
+      1 => t('Yes'),
+      0 => t('No')
+    ),
+    '#default_value' => variable_get('chatbox_enable_custom_login', 0)
+  );
+
+  $form['chatbox_custom_login_secret'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Chatbox secret'),
+    '#default_value' => variable_get('chatbox_custom_login_secret', '')
+  );
+
+  return $form;
+}
+
+/**
+ *  Implements hook_block_save().
+ */
+function chatwing_block_save($delta = '', $edit = array()) {
+  if ($delta == 'chatwing') {
+    variable_set('chatwing_chatbox', $edit['chatwing_chatbox']);
+    variable_set('chatwing_chatbox_width', $edit['chatwing_chatbox_width']);
+    variable_set('chatwing_chatbox_height', $edit['chatwing_chatbox_height']);
+    variable_set('chatbox_enable_custom_login', $edit['chatbox_enable_custom_login']);
+    variable_set('chatbox_custom_login_secret', $edit['chatbox_custom_login_secret']);
+  }
+}
+
+/**
+ * Output chatwing block
+ * @param  string $delta [description]
+ * @return [type]        [description]
+ */
+function chatwing_block_view($delta = '') {
+  switch ($delta) {
+    case 'chatwing':
+      if (variable_get('chatwing_chatbox')) {
+        $block['subject'] = t('Chatwing');
+        if (user_access('access content')) {
+          global $user;
+          chatwing_get_container();
+          $box = \Chatwing\Application::get('chatbox', 'chatwing');
+          $box->setKey(variable_get('chatwing_chatbox'));
+          $box->setWidth(variable_get('chatwing_chatbox_width') ? variable_get('chatwing_chatbox_width') : variable_get('chatwing_chatbox_default_width'));
+          $box->setHeight(variable_get('chatwing_chatbox_height') ? variable_get('chatwing_chatbox_height') : variable_get('chatwing_chatbox_default_height'));
+          if (variable_get('chatbox_enable_custom_login') && variable_get('chatbox_custom_login_secret') && $user->uid) {
+            $box->setSecret(variable_get('chatbox_custom_login_secret'));
+            $preparedData = array(
+              'id' => $user->uid,
+              'name' => $user->name,
+              'expire' => round(microtime(TRUE) * 1000) + 60*60*1000
+            );
+            $box->setParam(array('custom_session' => $preparedData));
+          }
+          $block['content'] = "<div class='chatwing-chatbox'>" . $box->getIframe() . "</div>";
+        }
+        return $block;
+      }
+  }
+}
+
+/**
+ * [chatwing_menu description]
+ * @return array [type] [description]
+ */
+function chatwing_menu() {
+  $items = array();
+  $items['admin/config/chatwing'] = array(
+    'title' => 'Chatwing',
+    'description' => t('General configuration for chatwing'),
+    'page callback' => 'chatwing_configuration_form',
+    'page arguments' => array('chatwing_form'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  return $items;
+}
+
+
+/**
+ * ======================================================================
+ * ======================================================================
+ * Those functions below is for internal use (sdk load, init...)
+ * ======================================================================
+ * ======================================================================
+ */
+
+/**
+ * Get sdk container && init if needed
+ * @return \Chatwing\Container
+ */
+function chatwing_get_container() {
+  // check if App has been initialized before
+  try {
+    if (!\Chatwing\Application::has('init')) {
+      \Chatwing\Application::bind('client_id', CW_CLIENT, 'chatwing');
+      \Chatwing\Application::bind('access_token', variable_get('chatwing_access_token', ''), 'chatwing');
+      \Chatwing\Application::bind('init', TRUE);
+    }
+  }
+  catch (Exception $e) {
+    return $e;
+  }
+
+  return \Chatwing\Application::getContainerInstance();
+}
+
+function chatwing_get_chatboxes_list() {
+  $container = chatwing_get_container();
+  $boxesList = array();
+  try {
+    $result = $container->get('api', 'chatwing')->call('user/chatbox/list');
+    if ($result->success && $result->pagination->total > 0) {
+      foreach ($result->data as $box) {
+        $boxesList[$box->key] = $box->name;
+      }
+    }
+  }
+  catch (Exception $e) {
+    return array();
+  }
+
+  return $boxesList;
+}
+
+function chatwing_get_chatbox_iframe($key, $width, $height) {
+
+}
